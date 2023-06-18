@@ -1,0 +1,15 @@
+[package]
+edition = "2021"
+name = "molecule"
+version = "0.0.1"
+
+[dependencies]
+atom = { git = "https://github.com/ippras/atom" }
+lazy_static = "1.4.0"
+petgraph = "0.6.3"
+regex = "1.8.4"
+serde = { version = "1.0.163", features = ["derive"] }
+thiserror = "1.0.40"
+
+[dev-dependencies]
+maplit = "1.0.2"
