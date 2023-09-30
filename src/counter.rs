@@ -1,6 +1,5 @@
 use crate::{Error, Result};
-use atom::{Atom, ABRIDGED};
-use lazy_static::lazy_static;
+use atom::Isotope;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -9,27 +8,40 @@ use std::{
     num::NonZeroUsize,
     ops::Deref,
     str::FromStr,
+    sync::LazyLock,
 };
+
+pub macro counter {
+    ($($key:expr => $value:expr),* $(,)*) => {{
+        let mut _map = ::std::collections::BTreeMap::<Isotope, NonZeroUsize>::new();
+        $(
+            _map.entry(($key).into())
+                .and_modify(|value| *value = value.saturating_add($value))
+                .or_insert(NonZeroUsize::new($value).unwrap());
+        )*
+        Counter(_map)
+    }}
+}
 
 /// Atom counter
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct Counter(BTreeMap<Atom, NonZeroUsize>);
+pub struct Counter(BTreeMap<Isotope, NonZeroUsize>);
 
 impl Counter {
-    pub fn new(counter: BTreeMap<Atom, NonZeroUsize>) -> Self {
+    pub fn new(counter: BTreeMap<Isotope, NonZeroUsize>) -> Self {
         Self(counter)
     }
 
     pub fn weight(&self) -> f64 {
         self.0
             .iter()
-            .map(|(atom, count)| atom.weight::<ABRIDGED>().unwrap().average() * count.get() as f64)
+            .map(|(isotope, count)| isotope.relative_atomic_mass().value * count.get() as f64)
             .sum()
     }
 }
 
 impl Deref for Counter {
-    type Target = BTreeMap<Atom, NonZeroUsize>;
+    type Target = BTreeMap<Isotope, NonZeroUsize>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -48,8 +60,8 @@ impl Display for Counter {
     }
 }
 
-impl FromIterator<(Atom, NonZeroUsize)> for Counter {
-    fn from_iter<T: IntoIterator<Item = (Atom, NonZeroUsize)>>(iter: T) -> Self {
+impl FromIterator<(Isotope, NonZeroUsize)> for Counter {
+    fn from_iter<T: IntoIterator<Item = (Isotope, NonZeroUsize)>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
@@ -58,10 +70,9 @@ impl FromStr for Counter {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
-        lazy_static! {
-            static ref ATOM_COUNT: Regex =
-                Regex::new("([A-Z][a-z]*)([0-9]*)").expect("ATOM_COUNT regex");
-        }
+        static ATOM_COUNT: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new("([A-Z][a-z]*)([0-9]*)").expect("lazy static `ATOM_COUNT`")
+        });
 
         let mut counter = BTreeMap::new();
         for captures in ATOM_COUNT.captures_iter(value) {
@@ -85,15 +96,15 @@ impl FromStr for Counter {
 
 #[test]
 fn test() {
-    use atom::Atom::{C, H, O};
-    use maplit::btreemap;
+    use atom::isotopes::{C, H, O};
 
     assert_eq!(
-        Ok(Counter(btreemap! {
-            H => NonZeroUsize::new(6).unwrap(),
-            C => NonZeroUsize::new(2).unwrap(),
-            O => NonZeroUsize::new(1).unwrap(),
-        })),
+        Ok(counter! {
+            C::Twelve => 2,
+            H::One => 5,
+            O::Sixteen => 1,
+            H::One => 1,
+        }),
         "C2H5OH".parse()
     );
 }
