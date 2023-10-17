@@ -1,13 +1,13 @@
 [package]
 edition = "2021"
 name = "molecule"
-version = "0.0.2"
+version = "0.0.3"
 
 [dependencies]
 atom = { git = "https://github.com/ippras/atom", features = ["serde"] }
 petgraph = "0.6.4"
-regex = "1.9.6"
-serde = { version = "1.0.188", features = ["derive"] }
+regex = "1.10.2"
+serde = { version = "1.0.189", features = ["derive"] }
 thiserror = "1.0.49"
 
 [dev-dependencies]
