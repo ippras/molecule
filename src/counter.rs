@@ -6,7 +6,7 @@ use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     num::NonZeroUsize,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     str::FromStr,
     sync::LazyLock,
 };
@@ -16,10 +16,10 @@ pub macro counter {
         let mut _map = ::std::collections::BTreeMap::<Isotope, NonZeroUsize>::new();
         $(
             _map.entry(($key).into())
-                .and_modify(|value| *value = value.saturating_add($value))
-                .or_insert(NonZeroUsize::new($value).unwrap());
+                .and_modify(|value| *value = value.saturating_add($value.try_into().unwrap()))
+                .or_insert($value.try_into().unwrap());
         )*
-        Counter(_map)
+        Counter::new(_map)
     }}
 }
 
@@ -30,6 +30,10 @@ pub struct Counter(BTreeMap<Isotope, NonZeroUsize>);
 impl Counter {
     pub fn new(counter: BTreeMap<Isotope, NonZeroUsize>) -> Self {
         Self(counter)
+    }
+
+    pub fn count<T: Into<Isotope>>(&self, t: T) -> usize {
+        self.0.get(&t.into()).map_or(0, |c| c.get())
     }
 
     pub fn weight(&self) -> f64 {
@@ -45,6 +49,12 @@ impl Deref for Counter {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Counter {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -99,7 +109,7 @@ fn test() {
     use atom::isotopes::{C, H, O};
 
     let counter = counter! {
-        C::Twelve => 2,
+        C::Twelve => NonZeroUsize::new(2).unwrap(),
         H::One => 5,
         O::Sixteen => 1,
         H::One => 1,
